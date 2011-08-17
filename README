@@ -1,0 +1,10 @@
+Skein is a hash function which was entered into the SHA-3 competition.
+
+For me, the most interesting part is the underlying block cipher, Threefish.
+
+This project attempts to implement Threefish in a clear and understandable manner, while still achieving decent performance. To this end, optimizations such as function inlining and loop unrolling are not performed manually, but are expected to be performed by the compiler.
+
+Interesting observations about Threefish:
+
+1. Each subkey depends on every bit of the key and every bit of the tweak.
+2. The mix function is unusually simple. This is compensated for by an unusually high number of rounds.
