@@ -176,13 +176,13 @@ static int threefish256_decrypt(u64 key[WORDS+1], u64 tweak[2], u64 ciphertext[W
 #undef ROUNDS
 #define WORDS 8
 #define ROUNDS 72
-static int threefish512_encrypt(u64 key[WORDS+1], u64 tweak[2], u64 plaintext[WORDS], u64 ciphertext[WORDS])
+int threefish512_encrypt(u64 key[WORDS+1], u64 tweak[2], u64 plaintext[WORDS], u64 ciphertext[WORDS])
 {
 	threefish_encrypt_generic(WORDS, ROUNDS, rot_8, perm_8, key, tweak, plaintext, ciphertext);
 	return 0;
 }
 
-static int threefish512_decrypt(u64 key[WORDS+1], u64 tweak[2], u64 ciphertext[WORDS], u64 plaintext[WORDS])
+int threefish512_decrypt(u64 key[WORDS+1], u64 tweak[2], u64 ciphertext[WORDS], u64 plaintext[WORDS])
 {
 	threefish_decrypt_generic(WORDS, ROUNDS, rot_8, perm_8, key, tweak, ciphertext, plaintext);
 	return 0;
@@ -229,6 +229,7 @@ int decrypt(size_t block_size, u8 key[], u8 tweak[16], u8 ciphertext[], u8 plain
 	return 0;
 }
 
+#ifdef TEST
 static void thing(int len, u8 key[], u8 tweak[], u8 plaintext[])
 {
 	u8 ciphertext[len];
@@ -247,7 +248,8 @@ static void thing(int len, u8 key[], u8 tweak[], u8 plaintext[])
 	//printf("\n");
 }
 
-int main() {
+static void test()
+{
 	u8 key[132] = "passwordpasswordpasswordpassword";
 	u8 plaintext[128] = "plaintxtplaintxtplaintxtplaintxt";
 	u8 tweak[16] = {0};
@@ -255,6 +257,11 @@ int main() {
 	thing(32, key, tweak, plaintext);
 	thing(64, key, tweak, plaintext);
 	thing(128, key, tweak, plaintext);
+}
 
+int main()
+{
+	test();
 	return 0;
 }
+#endif

@@ -1,2 +1,6 @@
+*.o
+
 /threefish
+/cbc
+
 /.redo/
