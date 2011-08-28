@@ -44,12 +44,11 @@ static inline void mix(u64 x0, u64 x1, u64 *y0, u64 *y1, u8 r)
 	*y0 = tmp;
 }
 
-/* x and y may alias */
-static inline void mixinv(u64 y[2], u64 x[2], u8 r)
+static inline void mixinv(u64 y0, u64 y1, u64 *x0, u64 *x1, u8 r)
 {
-	u64 x1 = ror64(y[0] ^ y[1], r);
-	x[0] = y[0] - x1;
-	x[1] = x1;
+	u64 tmp = ror64(y0 ^ y1, r);
+	*x0 = y0 - tmp;
+	*x1 = tmp;
 }
 
 // Perform 1 round of Threefish on ``v``.
@@ -65,16 +64,10 @@ static FORCEINLINE void threefish_round(const unsigned nwords, u64 v[nwords], co
 	}
 }
 
-static FORCEINLINE void threefish_roundinv(const unsigned nwords, u64 v[nwords], const u8 r[nwords/2], const u8 perm[nwords])
+static FORCEINLINE void threefish_roundinv(const unsigned nwords, u64 v[nwords], const u8 r[nwords/2], const u8 p[nwords])
 {
-	u64 tmp[nwords];
-	// permute
-	for (unsigned int i = 0; i < nwords; i++) {
-		tmp[perm[i]] = v[i];
-	}
-	// mix pairs of words
 	for (unsigned int i = 0; i < nwords; i += 2) {
-		mixinv(&tmp[i], &v[i], r[i / 2]);
+		mixinv(v[p[i]], v[p[i+1]], &v[p[i]], &v[p[i+1]], r[i / 2]);
 	}
 }
 
@@ -155,12 +148,20 @@ threefish_decrypt_generic(const unsigned nwords, const unsigned nrounds,
 	}
 
 	for (unsigned int d = nrounds; d > 0;) {
-		d -= 4;
-		threefish_roundinv(nwords, v, rot[(d + 3) % 8], perm[1]);
-		threefish_roundinv(nwords, v, rot[(d + 2) % 8], perm[1]);
-		threefish_roundinv(nwords, v, rot[(d + 1) % 8], perm[1]);
-		threefish_roundinv(nwords, v, rot[(d + 0) % 8], perm[1]);
+		d -= 8;
 
+		threefish_roundinv(nwords, v, rot[(d + 7) % 8], perm[3]);
+		threefish_roundinv(nwords, v, rot[(d + 6) % 8], perm[2]);
+		threefish_roundinv(nwords, v, rot[(d + 5) % 8], perm[1]);
+		threefish_roundinv(nwords, v, rot[(d + 4) % 8], perm[0]);
+		for (unsigned int i = 0; i < nwords; i++) {
+			v[i] -= subkeys[d / 4 + 1][i];
+		}
+
+		threefish_roundinv(nwords, v, rot[(d + 3) % 8], perm[3]);
+		threefish_roundinv(nwords, v, rot[(d + 2) % 8], perm[2]);
+		threefish_roundinv(nwords, v, rot[(d + 1) % 8], perm[1]);
+		threefish_roundinv(nwords, v, rot[(d + 0) % 8], perm[0]);
 		for (unsigned int i = 0; i < nwords; i++) {
 			v[i] -= subkeys[d / 4][i];
 		}
