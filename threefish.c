@@ -20,14 +20,26 @@ static inline u64 ror64(u64 x, u8 r)
 	return (x >> (r & 63)) | (x << (64 - (r & 63)));
 }
 
-/* x and y may alias */
-static inline void mix(u64 x[2], u64 y[2], u8 r)
+// The mix function looks like this:
+//
+//  x0      x1
+//   ↓      │
+//  add←────┤
+//   │      ↓
+//   │    rotate
+//   │      ↓
+//   ├────→xor
+//   ↓      ↓
+//  y0      y1
+//
+static inline void mix(u64 x0, u64 x1, u64 *y0, u64 *y1, u8 r)
 {
-	u64 y0 = x[0] + x[1];
-	y[1] = rol64(x[1], r) ^ y0;
-	y[0] = y0;
+	u64 tmp = x0 + x1;
+	*y1 = rol64(x1, r) ^ tmp;
+	*y0 = tmp;
 }
 
+/* x and y may alias */
 static inline void mixinv(u64 y[2], u64 x[2], u8 r)
 {
 	u64 x1 = ror64(y[0] ^ y[1], r);
@@ -35,18 +47,19 @@ static inline void mixinv(u64 y[2], u64 x[2], u8 r)
 	x[1] = x1;
 }
 
-static FORCEINLINE void threefish_round(const unsigned nwords, u64 v[nwords], const u8 r[nwords/2], const u8 perm[nwords])
+// Perform 1 round of Threefish on ``v``.
+// ``r`` gives the rotation constants.
+//
+// This function does *not* permute the array—it merely *pretends* that the
+// array has been permuted. ``p`` gives the order the elements would be in
+// if the previous permutations had actually taken place.
+static FORCEINLINE void threefish_round(const unsigned nwords, u64 v[nwords], const u8 r[nwords/2], const u8 p[nwords])
 {
-	u64 tmp[nwords];
-	// mix pairs of words
 	for (unsigned int i = 0; i < nwords; i += 2) {
-		mix(&v[i], &tmp[i], r[i / 2]);
-	}
-	// permute
-	for (unsigned int i = 0; i < nwords; i++) {
-		v[i] = tmp[perm[i]];
+		mix(v[p[i]], v[p[i+1]], &v[p[i]], &v[p[i+1]], r[i / 2]);
 	}
 }
+
 static FORCEINLINE void threefish_roundinv(const unsigned nwords, u64 v[nwords], const u8 r[nwords/2], const u8 perm[nwords])
 {
 	u64 tmp[nwords];
@@ -62,7 +75,7 @@ static FORCEINLINE void threefish_roundinv(const unsigned nwords, u64 v[nwords],
 
 static FORCEINLINE void
 threefish_encrypt_generic(const unsigned nwords, const unsigned nrounds,
-                          const u8 rot[8][nwords/2], const u8 perm[nwords/2],
+                          const u8 rot[8][nwords/2], const u8 perm[4][nwords],
                           u64 key[nwords+1], u64 tweak[2],
                           u64 plaintext[nwords], u64 ciphertext[nwords])
 {
@@ -92,18 +105,18 @@ threefish_encrypt_generic(const unsigned nwords, const unsigned nrounds,
 		for (unsigned int i = 0; i < nwords; i++) {
 			v[i] += subkeys[d / 4][i];
 		}
-		threefish_round(nwords, v, rot[(d + 0) % 8], perm);
-		threefish_round(nwords, v, rot[(d + 1) % 8], perm);
-		threefish_round(nwords, v, rot[(d + 2) % 8], perm);
-		threefish_round(nwords, v, rot[(d + 3) % 8], perm);
+		threefish_round(nwords, v, rot[(d + 0) % 8], perm[0]);
+		threefish_round(nwords, v, rot[(d + 1) % 8], perm[1]);
+		threefish_round(nwords, v, rot[(d + 2) % 8], perm[2]);
+		threefish_round(nwords, v, rot[(d + 3) % 8], perm[3]);
 
 		for (unsigned int i = 0; i < nwords; i++) {
 			v[i] += subkeys[d / 4 + 1][i];
 		}
-		threefish_round(nwords, v, rot[(d + 4) % 8], perm);
-		threefish_round(nwords, v, rot[(d + 5) % 8], perm);
-		threefish_round(nwords, v, rot[(d + 6) % 8], perm);
-		threefish_round(nwords, v, rot[(d + 7) % 8], perm);
+		threefish_round(nwords, v, rot[(d + 4) % 8], perm[0]);
+		threefish_round(nwords, v, rot[(d + 5) % 8], perm[1]);
+		threefish_round(nwords, v, rot[(d + 6) % 8], perm[2]);
+		threefish_round(nwords, v, rot[(d + 7) % 8], perm[3]);
 	}
 
 	for (int i = 0; i < nwords; i++) {
@@ -113,7 +126,7 @@ threefish_encrypt_generic(const unsigned nwords, const unsigned nrounds,
 
 static FORCEINLINE void
 threefish_decrypt_generic(const unsigned nwords, const unsigned nrounds,
-                          const u8 rot[8][nwords/2], const u8 perm[nwords],
+                          const u8 rot[8][nwords/2], const u8 perm[4][nwords],
                           u64 key[nwords+1], u64 tweak[2],
                           u64 ciphertext[nwords], u64 plaintext[nwords])
 {
@@ -142,10 +155,10 @@ threefish_decrypt_generic(const unsigned nwords, const unsigned nrounds,
 
 	for (unsigned int d = nrounds; d > 0;) {
 		d -= 4;
-		threefish_roundinv(nwords, v, rot[(d + 3) % 8], perm);
-		threefish_roundinv(nwords, v, rot[(d + 2) % 8], perm);
-		threefish_roundinv(nwords, v, rot[(d + 1) % 8], perm);
-		threefish_roundinv(nwords, v, rot[(d + 0) % 8], perm);
+		threefish_roundinv(nwords, v, rot[(d + 3) % 8], perm[1]);
+		threefish_roundinv(nwords, v, rot[(d + 2) % 8], perm[1]);
+		threefish_roundinv(nwords, v, rot[(d + 1) % 8], perm[1]);
+		threefish_roundinv(nwords, v, rot[(d + 0) % 8], perm[1]);
 
 		for (unsigned int i = 0; i < nwords; i++) {
 			v[i] -= subkeys[d / 4][i];
