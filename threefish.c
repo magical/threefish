@@ -3,7 +3,12 @@
 #include <stdio.h> /* fwrite, printf */
 #include <string.h> /* memcmp */
 
-#define FORCEINLINE __attribute__((__always_inline__))
+// GCC refuses to inline any function with a stack-allocated Variable Length
+// Array. Clang is a bit smarter, but still gives up when faced with functions
+// of the length we are dealing with (at least, that's my guess).
+//
+// Fortunately, they both support GCC's always_inline attribute.
+#define FORCEINLINE __attribute__((always_inline)) inline
 
 typedef uint8_t u8;
 typedef uint64_t u64;
@@ -73,29 +78,40 @@ static FORCEINLINE void threefish_roundinv(const unsigned nwords, u64 v[nwords],
 	}
 }
 
-static FORCEINLINE void
-threefish_encrypt_generic(const unsigned nwords, const unsigned nrounds,
-                          const u8 rot[8][nwords/2], const u8 perm[4][nwords],
-                          u64 key[nwords+1], u64 tweak[2],
-                          u64 plaintext[nwords], u64 ciphertext[nwords])
-{
-	u64 subkeys[nrounds/4 + 1][nwords];
-	u64 t[3] = {tweak[0], tweak[1], tweak[0] ^ tweak[1]};
 
-	key[nwords] = C240;
-	for (int i = 0; i < nwords; i++) {
-		key[nwords] ^= key[i];
+// Expand a threefish key.
+static FORCEINLINE void threefish_expand(const unsigned nwords, const unsigned nrounds,
+                             u64 key[nwords], u64 tweak[2],
+                             u64 subkeys[nrounds/4 + 1][nwords])
+{
+	u64 xkey[nwords + 1];
+	u64 xtweak[3] = {tweak[0], tweak[1], tweak[0] ^ tweak[1]};
+
+	xkey[nwords] = C240;
+	for (unsigned i = 0; i < nwords; i++) {
+		xkey[i] = key[i];
+		xkey[nwords] ^= key[i];
 	}
 
 	// expand the key
-	for (int s = 0; s <= nrounds / 4; s++) {
-		for (int i = 0; i < nwords; i++) {
-			subkeys[s][i] = key[(s + i) % (nwords + 1)];
+	for (unsigned s = 0; s < nrounds/4 + 1; s++) {
+		for (unsigned i = 0; i < nwords; i++) {
+			subkeys[s][i] = xkey[(s + i) % (nwords + 1)];
 		}
-		subkeys[s][nwords - 3] += t[s % 3];
-		subkeys[s][nwords - 2] += t[(s + 1) % 3];
+		subkeys[s][nwords - 3] += xtweak[s % 3];
+		subkeys[s][nwords - 2] += xtweak[(s + 1) % 3];
 		subkeys[s][nwords - 1] += s;
 	}
+}
+
+static FORCEINLINE void
+threefish_encrypt_generic(const unsigned nwords, const unsigned nrounds,
+                          const u8 rot[8][nwords/2], const u8 perm[4][nwords],
+                          u64 key[nwords], u64 tweak[2],
+                          u64 plaintext[nwords], u64 ciphertext[nwords])
+{
+	u64 subkeys[nrounds/4 + 1][nwords];
+	threefish_expand(nwords, nrounds, key, tweak, subkeys);
 
 	u64 v[nwords];
 	for (int i = 0; i < nwords; i++) {
@@ -127,26 +143,11 @@ threefish_encrypt_generic(const unsigned nwords, const unsigned nrounds,
 static FORCEINLINE void
 threefish_decrypt_generic(const unsigned nwords, const unsigned nrounds,
                           const u8 rot[8][nwords/2], const u8 perm[4][nwords],
-                          u64 key[nwords+1], u64 tweak[2],
+                          u64 key[nwords], u64 tweak[2],
                           u64 ciphertext[nwords], u64 plaintext[nwords])
 {
 	u64 subkeys[nrounds/4 + 1][nwords];
-	u64 t[3] = {tweak[0], tweak[1], tweak[0] ^ tweak[1]};
-
-	key[nwords] = C240;
-	for (int i = 0; i < nwords; i++) {
-		key[nwords] ^= key[i];
-	}
-
-	// expand the key
-	for (int s = 0; s <= nrounds / 4; s++) {
-		for (int i = 0; i < nwords; i++) {
-			subkeys[s][i] = key[(s + i) % (nwords + 1)];
-		}
-		subkeys[s][nwords - 3] += t[s % 3];
-		subkeys[s][nwords - 2] += t[(s + 1) % 3];
-		subkeys[s][nwords - 1] += s;
-	}
+	threefish_expand(nwords, nrounds, key, tweak, subkeys);
 
 	u64 v[nwords];
 	for (int i = 0; i < nwords; i++) {
@@ -173,13 +174,13 @@ threefish_decrypt_generic(const unsigned nwords, const unsigned nrounds,
 
 #define WORDS 4
 #define ROUNDS 72
-static int threefish256_encrypt(u64 key[WORDS+1], u64 tweak[2], u64 plaintext[WORDS], u64 ciphertext[WORDS])
+int threefish256_encrypt(u64 key[WORDS], u64 tweak[2], u64 plaintext[WORDS], u64 ciphertext[WORDS])
 {
 	threefish_encrypt_generic(WORDS, ROUNDS, rot_4, perm_4, key, tweak, plaintext, ciphertext);
 	return 0;
 }
 
-static int threefish256_decrypt(u64 key[WORDS+1], u64 tweak[2], u64 ciphertext[WORDS], u64 plaintext[WORDS])
+int threefish256_decrypt(u64 key[WORDS], u64 tweak[2], u64 ciphertext[WORDS], u64 plaintext[WORDS])
 {
 	threefish_decrypt_generic(WORDS, ROUNDS, rot_4, perm_4, key, tweak, ciphertext, plaintext);
 	return 0;
@@ -189,13 +190,13 @@ static int threefish256_decrypt(u64 key[WORDS+1], u64 tweak[2], u64 ciphertext[W
 #undef ROUNDS
 #define WORDS 8
 #define ROUNDS 72
-int threefish512_encrypt(u64 key[WORDS+1], u64 tweak[2], u64 plaintext[WORDS], u64 ciphertext[WORDS])
+int threefish512_encrypt(u64 key[WORDS], u64 tweak[2], u64 plaintext[WORDS], u64 ciphertext[WORDS])
 {
 	threefish_encrypt_generic(WORDS, ROUNDS, rot_8, perm_8, key, tweak, plaintext, ciphertext);
 	return 0;
 }
 
-int threefish512_decrypt(u64 key[WORDS+1], u64 tweak[2], u64 ciphertext[WORDS], u64 plaintext[WORDS])
+int threefish512_decrypt(u64 key[WORDS], u64 tweak[2], u64 ciphertext[WORDS], u64 plaintext[WORDS])
 {
 	threefish_decrypt_generic(WORDS, ROUNDS, rot_8, perm_8, key, tweak, ciphertext, plaintext);
 	return 0;
@@ -205,13 +206,13 @@ int threefish512_decrypt(u64 key[WORDS+1], u64 tweak[2], u64 ciphertext[WORDS], 
 #undef ROUNDS
 #define WORDS 16
 #define ROUNDS 80
-static int threefish1024_encrypt(u64 key[WORDS+1], u64 tweak[2], u64 plaintext[WORDS], u64 ciphertext[WORDS])
+int threefish1024_encrypt(u64 key[WORDS], u64 tweak[2], u64 plaintext[WORDS], u64 ciphertext[WORDS])
 {
 	threefish_encrypt_generic(WORDS, ROUNDS, rot_16, perm_16, key, tweak, plaintext, ciphertext);
 	return 0;
 }
 
-static int threefish1024_decrypt(u64 key[WORDS+1], u64 tweak[2], u64 ciphertext[WORDS], u64 plaintext[WORDS])
+int threefish1024_decrypt(u64 key[WORDS], u64 tweak[2], u64 ciphertext[WORDS], u64 plaintext[WORDS])
 {
 	threefish_decrypt_generic(WORDS, ROUNDS, rot_16, perm_16, key, tweak, ciphertext, plaintext);
 	return 0;
@@ -263,7 +264,7 @@ static void thing(int len, u8 key[], u8 tweak[], u8 plaintext[])
 
 static void test()
 {
-	u8 key[132] = "passwordpasswordpasswordpassword";
+	u8 key[128] = "passwordpasswordpasswordpassword";
 	u8 plaintext[128] = "plaintxtplaintxtplaintxtplaintxt";
 	u8 tweak[16] = {0};
 

@@ -9,13 +9,10 @@
 
 #undef WORDS
 #define WORDS 8
-static int encrypt_cbc_fp(FILE *fp, FILE *outfp, u8 key[WORDS*8], u64 iv[WORDS])
+static int encrypt_cbc_fp(FILE *fp, FILE *outfp, u8 key[WORDS], u64 iv[WORDS])
 {
-	u64 wkey[WORDS+1];
+	u64 *wkey = (u64*)key;
 	u64 tweak[2] = {0,0};
-	for (int i = 0; i < WORDS; i++) {
-		wkey[i] = ((u64*)key)[i];
-	}
 
 	u64 plaintext[2][WORDS];
 	u64 ciphertext[WORDS];
@@ -95,13 +92,10 @@ static int encrypt_cbc_fp(FILE *fp, FILE *outfp, u8 key[WORDS*8], u64 iv[WORDS])
 
 #undef WORDS
 #define WORDS 8
-static int decrypt_cbc_fp(FILE *fp, FILE *outfp, u8 key[WORDS*8], u64 iv[WORDS])
+static int decrypt_cbc_fp(FILE *fp, FILE *outfp, u8 key[WORDS])
 {
-	u64 wkey[WORDS+1];
+	u64 *wkey = (u64*)key;
 	u64 tweak[2] = {0,0};
-	for (int i = 0; i < WORDS; i++) {
-		wkey[i] = ((u64*)key)[i];
-	}
 
 	u64 ciphertext[2][WORDS];
 	u64 plaintext[WORDS];
@@ -164,7 +158,7 @@ int main(int argc, char *argv[])
 	u8 key[64] = "password";
 	u64 iv[8] = {};
 	if (1 < argc && strcmp(argv[1], "-d") == 0) {
-		return !!decrypt_cbc_fp(stdin, stdout, key, iv);
+		return !!decrypt_cbc_fp(stdin, stdout, key);
 	} else {
 		return !!encrypt_cbc_fp(stdin, stdout, key, iv);
 	}
