@@ -1,8 +1,8 @@
 
 #define C240 0x1BD11BDAA9FC1A22ULL
 
-// rotation constants for Nw == 4
-static const u8 rot_4[8][2] = {
+// rotation constants for Threefish-256
+static const u8 rot_256[8][2] = {
 	{14, 16},
 	{52, 57},
 	{23, 40},
@@ -13,8 +13,8 @@ static const u8 rot_4[8][2] = {
 	{32, 32},
 };
 
-// rotation constants for Nw == 8
-static const u8 rot_8[8][4] = {
+// rotation constants for Threefish-512
+static const u8 rot_512[8][4] = {
 	{46, 36, 19, 37},
 	{33, 27, 14, 42},
 	{17, 49, 36, 39},
@@ -25,8 +25,8 @@ static const u8 rot_8[8][4] = {
 	{ 8, 35, 56, 22},
 };
 
-// rotation constants for Nw == 16
-static const u8 rot_16[8][8] = {
+// rotation constants for Threefish-1024
+static const u8 rot_1024[8][8] = {
 	{24, 13,  8, 47,  8, 17, 22, 37},
 	{38, 19, 10, 55, 49, 18, 23, 52},
 	{33,  4, 51, 13, 34, 41, 59, 17},
@@ -38,19 +38,22 @@ static const u8 rot_16[8][8] = {
 };
 
 // permutation constants
-static const u8 perm_4[4][4] = {
+static const u8 perm_256[4][4] = {
 	{0, 1, 2, 3},
 	{0, 3, 2, 1},
 	{0, 1, 2, 3},
 	{0, 3, 2, 1},
 };
-static const u8 perm_8[4][8] = {
+
+// ghci> take 4 $ iterate (map ([2,1,4,7,6,5,0,3] !!)) [0..7]
+static const u8 perm_512[4][8] = {
 	{0, 1, 2, 3, 4, 5, 6, 7},
 	{2, 1, 4, 7, 6, 5, 0, 3},
 	{4, 1, 6, 3, 0, 5, 2, 7},
 	{6, 1, 0, 7, 2, 5, 4, 3},
 };
-static const u8 perm_16[4][16] = {
+
+static const u8 perm_1024[4][16] = {
 	{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
 	{0, 9, 2, 13, 6, 11, 4, 15, 10, 7, 12, 3, 14, 5, 8, 1},
 	{0, 7, 2, 5, 4, 3, 6, 1, 12, 15, 14, 13, 8, 11, 10, 9},

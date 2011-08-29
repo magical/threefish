@@ -177,13 +177,13 @@ threefish_decrypt_generic(const unsigned nwords, const unsigned nrounds,
 #define ROUNDS 72
 int threefish256_encrypt(u64 key[WORDS], u64 tweak[2], u64 plaintext[WORDS], u64 ciphertext[WORDS])
 {
-	threefish_encrypt_generic(WORDS, ROUNDS, rot_4, perm_4, key, tweak, plaintext, ciphertext);
+	threefish_encrypt_generic(WORDS, ROUNDS, rot_256, perm_256, key, tweak, plaintext, ciphertext);
 	return 0;
 }
 
 int threefish256_decrypt(u64 key[WORDS], u64 tweak[2], u64 ciphertext[WORDS], u64 plaintext[WORDS])
 {
-	threefish_decrypt_generic(WORDS, ROUNDS, rot_4, perm_4, key, tweak, ciphertext, plaintext);
+	threefish_decrypt_generic(WORDS, ROUNDS, rot_256, perm_256, key, tweak, ciphertext, plaintext);
 	return 0;
 }
 
@@ -193,13 +193,13 @@ int threefish256_decrypt(u64 key[WORDS], u64 tweak[2], u64 ciphertext[WORDS], u6
 #define ROUNDS 72
 int threefish512_encrypt(u64 key[WORDS], u64 tweak[2], u64 plaintext[WORDS], u64 ciphertext[WORDS])
 {
-	threefish_encrypt_generic(WORDS, ROUNDS, rot_8, perm_8, key, tweak, plaintext, ciphertext);
+	threefish_encrypt_generic(WORDS, ROUNDS, rot_512, perm_512, key, tweak, plaintext, ciphertext);
 	return 0;
 }
 
 int threefish512_decrypt(u64 key[WORDS], u64 tweak[2], u64 ciphertext[WORDS], u64 plaintext[WORDS])
 {
-	threefish_decrypt_generic(WORDS, ROUNDS, rot_8, perm_8, key, tweak, ciphertext, plaintext);
+	threefish_decrypt_generic(WORDS, ROUNDS, rot_512, perm_512, key, tweak, ciphertext, plaintext);
 	return 0;
 }
 
@@ -209,13 +209,13 @@ int threefish512_decrypt(u64 key[WORDS], u64 tweak[2], u64 ciphertext[WORDS], u6
 #define ROUNDS 80
 int threefish1024_encrypt(u64 key[WORDS], u64 tweak[2], u64 plaintext[WORDS], u64 ciphertext[WORDS])
 {
-	threefish_encrypt_generic(WORDS, ROUNDS, rot_16, perm_16, key, tweak, plaintext, ciphertext);
+	threefish_encrypt_generic(WORDS, ROUNDS, rot_1024, perm_1024, key, tweak, plaintext, ciphertext);
 	return 0;
 }
 
 int threefish1024_decrypt(u64 key[WORDS], u64 tweak[2], u64 ciphertext[WORDS], u64 plaintext[WORDS])
 {
-	threefish_decrypt_generic(WORDS, ROUNDS, rot_16, perm_16, key, tweak, ciphertext, plaintext);
+	threefish_decrypt_generic(WORDS, ROUNDS, rot_1024, perm_1024, key, tweak, ciphertext, plaintext);
 	return 0;
 }
 
